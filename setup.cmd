@@ -42,7 +42,7 @@ echo.
 if "!LATEST_VERSION!" neq "%CURRENT_VERSION%" (
     echo [!] YOUR VERSION IS OUTDATED!
     echo [*] A new version ^(!LATEST_VERSION!^) is available.
-    echo[*] Please re-download the files from the official website:
+    echo [*] Please re-download the files from the official website:
     echo [*] %WEBSITE_URL%
     echo.
     echo [*] This script will now clean up the outdated files.
