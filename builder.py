@@ -1,6 +1,3 @@
-# update v1.0.4 - release lol
-# update v1.1.2 - fixed multiple visual bugs, made it match the website + disabled fullscreen to reduce crashing and glitches
-
 import sys
 import os
 import subprocess
