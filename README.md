@@ -3,7 +3,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)
 
-Pyrat is a comprehensive Remote Access Trojan built in Python, designed to offer a wide array of remote management and surveillance capabilities through a Discord bot interface. This project combines features from various popular open-source RATs, while incorporating unique functions, enhancements, and critical bug fixes.
+Pyrat is a comprehensive Remote Access Trojan built in Python, designed to offer a wide array of remote management and surveillance capabilities through a Discord bot interface. This project combines features from various popular open-source RATs, while adding unique functions, enhancements, and critical bug fixes.
 
 > im not a skid :)
 
