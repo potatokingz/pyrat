@@ -114,3 +114,7 @@ After completing the setup, reopen the setup.cmd
 ## Credits
 
 This project is a synthesis of concepts and features found in various open-source Python RATs, including but not limited to PySilon. Full credit is given to the original developers and contributors of those projects.
+
+## Donate
+
+This project is entirely user-funded. Please donate at https://potatoking.net/donate! Thank you!
