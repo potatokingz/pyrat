@@ -1,0 +1,14 @@
+discord.py
+pyautogui
+pyttsx3
+pynput
+psutil
+opencv-python
+requests
+pywin32
+pycryptodome
+sounddevice
+scipy
+rarfile
+pyinstaller
+PyQt6
