@@ -2,7 +2,7 @@
 title PotatoKing Pyrat Builder - Setup
 setlocal EnableDelayedExpansion
 
-set "CURRENT_VERSION=v1.1.2"
+set "CURRENT_VERSION=v1.2.0"
 set "UPDATE_URL=https://pyrat.site/version"
 set "WEBSITE_URL=https://pyrat.site"
 
